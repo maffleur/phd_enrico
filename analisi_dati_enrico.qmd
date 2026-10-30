@@ -1,0 +1,633 @@
+---
+title: "Analisi dati per Enrico"
+format: pdf
+knitr:
+  opts_chunk:
+    warning: FALSE
+    echo: TRUE
+    message: FALSE
+    fig.width: 12 
+    fig.height: 6
+    cache: TRUE
+---
+
+```{r}
+#| echo: FALSE
+library(readxl)
+library(tidyverse)
+rawdata <- read_excel("C:/Users/MarziaScelsi/Downloads/MARZIA.xlsx")
+
+df <- rawdata %>% arrange(`Pressure (bar)`, `Temperature (K)`, `Flow (L/min)`,
+                          `Time (min)`) %>% 
+  mutate(Replicate = factor(rep(c("Replicate 1", "Replicate 2", "Replicate 3"), 
+                                length.out = nrow(rawdata)))) %>% 
+  rename("Pressure" = "Pressure (bar)",
+         "Temperature" = "Temperature (K)",
+         "Flow" = "Flow (L/min)",
+         "Time" = "Time (min)",
+         "FA" = "FAs content wt.%",
+         "C181" = "% C 18:1",
+         "C160" = "% C 16:0",
+         "C180" = "% C 18:0")
+```
+
+```{r}
+#| echo: FALSE
+
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+
+
+# Descriptive statistics
+
+## Data Quality Summary
+
+| Check                            | Finding    |
+|----------------------------------|------------|
+| Experimental runs                | 81         |
+| Process factors                  | 4          |
+| Response variables               | 5          |
+| Duplicate records                | 0          |
+| Missing extraction-yield results | 0          |
+| Missing fatty-acids results      | 18 (22.2%) |
+
+The 18 missing fatty-acid measurements are **not randomly distributed**:
+
+-   All occur at **60 bar**.
+
+-   Their extraction yields range from **0.09% to 0.62%**.
+
+-   Mean yield for these runs is **0.23%**, versus **4.02%** for runs with fatty-acid measurements.
+
+Fatty-acid composition was unavailable at 60 bar because insufficient material was extracted. These values should therefore be labelled as something like **“not measured due to insufficient extract”**, rather than automatically imputed.
+
+## Distribution of experimental factors
+
+This experimental design uses three levels for each factor:
+
+| Factor      | Levels           | Distribution    |
+|-------------|------------------|-----------------|
+| Pressure    | 60, 330, 600 bar | 18, 45, 18 runs |
+| Temperature | 303,333, 363 K   | 18, 45, 18 runs |
+| Flow        | 4, 7, 10 L/min   | 18, 45, 18 runs |
+| Time        | 30, 75, 120 mins | 18, 45, 18 runs |
+
+## Descriptive statistics
+
+```{r}
+#| echo: false
+# Response variables
+response_vars <- c(
+  "Extraction Yield wt.%",
+  "FAs content wt.%",
+  "% C 16:0",
+  "% C 18:1",
+  "% C 18:0"
+)
+
+# Descriptive statistics:
+# variables in columns and statistics in rows
+core_descriptives <- rawdata %>%
+  summarise(
+    across(
+      all_of(response_vars),
+      list(
+        n      = ~ sum(!is.na(.x)),
+        mean   = ~ mean(.x, na.rm = TRUE),
+        sd     = ~ sd(.x, na.rm = TRUE),
+        median = ~ median(.x, na.rm = TRUE),
+        q1     = ~ quantile(.x, probs = 0.25, na.rm = TRUE),
+        q3     = ~ quantile(.x, probs = 0.75, na.rm = TRUE),
+        min    = ~ min(.x, na.rm = TRUE),
+        max    = ~ max(.x, na.rm = TRUE)
+      ),
+      .names = "{.col}___{.fn}"
+    )
+  ) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = c("Variable", "Statistic"),
+    names_sep = "___",
+    values_to = "Value"
+  ) %>%
+  pivot_wider(
+    names_from = Variable,
+    values_from = Value
+  ) %>%
+  mutate(
+    across(
+      -Statistic,
+      ~ round(.x, digits = 2)
+    ),
+    Statistic = factor(
+      Statistic,
+      levels = c(
+        "n", "mean", "sd", "median",
+        "q1", "q3", "min", "max"
+      ),
+      labels = c(
+        "Valid n", "Mean", "SD", "Median",
+        "Q1", "Q3", "Minimum", "Maximum"
+      )
+    )
+  ) %>%
+  arrange(Statistic)
+```
+
+```{r}
+#| label: tbl-core-descriptives
+#| tbl-cap: "Core descriptive statistics for the experimental responses"
+#| echo: false
+#| warning: false
+#| message: false
+
+library(knitr)
+library(kableExtra)
+
+core_descriptives %>%
+  mutate(
+    across(
+      -Statistic,
+      ~ format(
+          .x,
+          digits = 2,
+          nsmall = 2,
+          trim = TRUE
+        )
+    )
+  ) %>%
+  kable(
+    format = "latex",
+    booktabs = TRUE,
+    align = c("l", rep("r", ncol(core_descriptives) - 1)),
+    escape = TRUE,
+    linesep = ""
+  ) %>%
+  kable_styling(
+    latex_options = c(
+      #"striped",
+      "HOLD_position",
+      "scale_down"
+    ),
+    font_size = 8,
+    position = "center",
+    full_width = FALSE
+  ) %>%
+  row_spec(
+    row = 0,
+    bold = TRUE
+  )
+```
+
+## Distribution plots
+
+### Histograms
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(rawdata) + geom_histogram(aes(x = `Extraction Yield wt.%`), bins = 20, fill = "steelblue", color = "black") +
+  labs(x = "Extraction Yield wt.%", y = "Count") +
+  theme_minimal()
+p2 <- ggplot(rawdata) + geom_histogram(aes(x = `FAs content wt.%`), bins = 20, fill = "coral", color = "black") +
+  labs(x = "FAs content wt.%", y = "Count") +
+  theme_minimal()
+multiplot(p1, p2, cols=2)
+```
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(rawdata) + geom_histogram(aes(x = `% C 18:0`), bins = 20, fill = "darkolivegreen", color = "black") +
+  labs(x = "% C 18:0", y = "Count") +
+  theme_minimal()
+p2 <- ggplot(rawdata) + geom_histogram(aes(x = `% C 16:0`), bins = 20, fill = "darkgoldenrod", color = "black") +
+  labs(x = "% C 16:0", y = "Count") +
+  theme_minimal()
+p3 <- ggplot(rawdata) + geom_histogram(aes(x = `% C 18:1`), bins = 20, fill = "palevioletred", color = "black") +
+  labs(x = "% C 18:1", y = "Count") +
+  theme_minimal()
+multiplot(p1, p2, p3, cols=3)
+```
+
+### Boxplots
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_boxplot(aes(x = factor(Pressure), y = `Extraction Yield wt.%`), fill = "steelblue") +
+  labs(x = "Pressure", y = "Extraction Yield wt.%", title = "Extraction Yield wt.% vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_boxplot(aes(x = factor(Temperature), y = `Extraction Yield wt.%`), fill = "steelblue") +
+  labs(x = "Temperature", y = "Extraction Yield wt.%", title = "Extraction Yield wt.% vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_boxplot(aes(x = factor(Flow), y = `Extraction Yield wt.%`), fill = "steelblue") +
+  labs(x = "Flow", y = "Extraction Yield wt.%", title = "Extraction Yield wt.% vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_boxplot(aes(x = factor(Time), y = `Extraction Yield wt.%`), fill = "steelblue") +
+  labs(x = "Time", y = "Extraction Yield wt.%", title = "Extraction Yield wt.% vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_boxplot(aes(x = factor(Pressure), y = FA), fill = "coral") +
+  labs(x = "Pressure", y = "FAs content wt.%", title = "FAs content wt.% vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_boxplot(aes(x = factor(Temperature), y = FA), fill = "coral") +
+  labs(x = "Temperature", y = "FAs contentd wt.%", title = "FAs content wt.% vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_boxplot(aes(x = factor(Flow), y = FA), fill = "coral") +
+  labs(x = "Flow", y = "FAs content wt.%", title = "FAs contentwt.% vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_boxplot(aes(x = factor(Time), y = FA), fill = "coral") +
+  labs(x = "Time", y = "FAs content wt.%", title = "FAs content wt.% vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_boxplot(aes(x = factor(Pressure), y = C180), fill = "darkolivegreen") +
+  labs(x = "Pressure", y = "% C 18:0", title = "% C 18:0 vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_boxplot(aes(x = factor(Temperature), y = C180), fill = "darkolivegreen") +
+  labs(x = "Temperature", y = "% C 18:0", title = "% C 18:0 vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_boxplot(aes(x = factor(Flow), y = C180), fill = "darkolivegreen") +
+  labs(x = "Flow", y = "% C 18:0", title = "% C 18:0 vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_boxplot(aes(x = factor(Time), y = C180), fill = "darkolivegreen") +
+  labs(x = "Time", y = "% C 18:0", title = "% C 18:0 vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_boxplot(aes(x = factor(Pressure), y = C160), fill = "darkgoldenrod") +
+  labs(x = "Pressure", y = "% C 16:0", title = "% C 16:0 vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_boxplot(aes(x = factor(Temperature), y = C160), fill = "darkgoldenrod") +
+  labs(x = "Temperature", y = "% C 16:0", title = "% C 16:0 vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_boxplot(aes(x = factor(Flow), y = C160), fill = "darkgoldenrod") +
+  labs(x = "Flow", y = "% C 16:0", title = "% C 16:0 vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_boxplot(aes(x = factor(Time), y = C160), fill = "darkgoldenrod") +
+  labs(x = "Time", y = "% C 16:0", title = "% C 16:0 vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_boxplot(aes(x = factor(Pressure), y = C181), fill = "palevioletred") +
+  labs(x = "Pressure", y = "% C 18:1", title = "% C 18:1 vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_boxplot(aes(x = factor(Temperature), y = C181), fill = "palevioletred") +
+  labs(x = "Temperature", y = "% C 18:1", title = "% C 18:1 vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_boxplot(aes(x = factor(Flow), y = C181), fill = "palevioletred") +
+  labs(x = "Flow", y = "% C 18:1", title = "% C 18:1 vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_boxplot(aes(x = factor(Time), y = C181), fill = "palevioletred") +
+  labs(x = "Time", y = "% C 18:1", title = "% C 18:1 vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+### Violin plots
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_violin(aes(x = factor(Pressure), y = `Extraction Yield wt.%`), fill = "steelblue") +
+  labs(x = "Pressure", y = "Extraction Yield wt.%", title = "Extraction Yield wt.% vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_violin(aes(x = factor(Temperature), y = `Extraction Yield wt.%`), fill = "steelblue") +
+  labs(x = "Temperature", y = "Extraction Yield wt.%", title = "Extraction Yield wt.% vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_violin(aes(x = factor(Flow), y = `Extraction Yield wt.%`), fill = "steelblue") +
+  labs(x = "Flow", y = "Extraction Yield wt.%", title = "Extraction Yield wt.% vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_violin(aes(x = factor(Time), y = `Extraction Yield wt.%`), fill = "steelblue") +
+  labs(x = "Time", y = "Extraction Yield wt.%", title = "Extraction Yield wt.% vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_violin(aes(x = factor(Pressure), y = FA), fill = "coral") +
+  labs(x = "Pressure", y = "FAs content wt.%", title = "FAs content wt.% vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_violin(aes(x = factor(Temperature), y = FA), fill = "coral") +
+  labs(x = "Temperature", y = "FAs content wt.%", title = "FAs content wt.% vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_violin(aes(x = factor(Flow), y = FA), fill = "coral") +
+  labs(x = "Flow", y = "FAs content wt.%", title = "FAs content wt.% vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_violin(aes(x = factor(Time), y = FA), fill = "coral") +
+  labs(x = "Time", y = "FAs content wt.%", title = "FAs content wt.% vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_violin(aes(x = factor(Pressure), y = C180), fill = "darkolivegreen") +
+  labs(x = "Pressure", y = "% C 18:0", title = "% C 18:0 vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_violin(aes(x = factor(Temperature), y = C180), fill = "darkolivegreen") +
+  labs(x = "Temperature", y = "% C 18:0", title = "% C 18:0 vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_violin(aes(x = factor(Flow), y = C180), fill = "darkolivegreen") +
+  labs(x = "Flow", y = "% C 18:0", title = "% C 18:0 vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_violin(aes(x = factor(Time), y = C180), fill = "darkolivegreen") +
+  labs(x = "Time", y = "% C 18:0", title = "% C 18:0 vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_violin(aes(x = factor(Pressure), y = C160), fill = "darkgoldenrod") +
+  labs(x = "Pressure", y = "% C 16:0", title = "% C 16:0 vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_violin(aes(x = factor(Temperature), y = C160), fill = "darkgoldenrod") +
+  labs(x = "Temperature", y = "% C 16:0", title = "% C 16:0 vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_violin(aes(x = factor(Flow), y = C160), fill = "darkgoldenrod") +
+  labs(x = "Flow", y = "% C 16:0", title = "% C 16:0 vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_violin(aes(x = factor(Time), y = C160), fill = "darkgoldenrod") +
+  labs(x = "Time", y = "% C 16:0", title = "% C 16:0 vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(df) + geom_violin(aes(x = factor(Pressure), y = C181), fill = "palevioletred") +
+  labs(x = "Pressure", y = "% C 18:1", title = "% C 18:1 vs pressure") +
+  theme_minimal()
+p2 <- ggplot(df) + geom_violin(aes(x = factor(Temperature), y = C181), fill = "palevioletred") +
+  labs(x = "Temperature", y = "% C 18:1", title = "% C 18:1 vs temperature") +
+  theme_minimal()
+p3 <- ggplot(df) + geom_violin(aes(x = factor(Flow), y = C181), fill = "palevioletred") +
+  labs(x = "Flow", y = "% C 18:1", title = "% C 18:1 vs flow") +
+  theme_minimal()
+p4 <- ggplot(df) + geom_violin(aes(x = factor(Time), y = C181), fill = "palevioletred") +
+  labs(x = "Time", y = "% C 18:1", title = "% C 18:1 vs time") +
+  theme_minimal()
+multiplot(p1, p2, p3, p4, cols=4)
+```
+
+
+## Correlation plots
+
+```{r}
+library(GGally)
+ggpairs(rawdata[, 9:13], upper = list(continuous=wrap("cor", method="spearman")))
+```
+
+Another type of correlation plot
+
+```{r}
+library(ggcorrplot)
+corr <- cor(rawdata[, 9:13], method = "spearman", use = "pairwise.complete.obs")
+p.mat <- cor_pmat(rawdata[, 9:13], method = "spearman")
+ggcorrplot(corr, type = "upper", p.mat = p.mat, insig='stars', method = 'circle', 
+           lab = TRUE, circle.scale = 2, colors = viridis::plasma(50),
+           title = "Spearman correlation matrix")
+
+```
+
+# Modelling
+
+## Model 1
+
+Linear mixed effect model for total fraction of fatty acids, with replicate as random effect and removing observations with missing values:
+
+```{r}
+library(nlme)
+mdl1 <- nlme::lme(fixed = FA ~ Pressure + Temperature + Flow + Time, 
+                 random = ~ 1 | Replicate, 
+                 data = df, 
+                 method = "REML", na.action = na.omit,
+                 # compound symmetry, because presumably the correlation 
+                 # between replicates should always be the same
+                 correlation = corCompSymm(form = ~ 1 | Replicate)) 
+summary(mdl1)
+```
+
+Various diagnostic plots for `mdl1`:
+
+```{r}
+# residuals vs fitted (default), should be uniformly scattered 
+# around the zero line
+plot(mdl1) 
+# observed vs fitted, should be distributed around the identity line
+plot(mdl1, FA ~ fitted(.) | Replicate, abline = c(0,1)) 
+# boxplot of residuals by replicate, should all be centred around zero 
+# and with similar variance
+plot(mdl1, Replicate ~ resid(.)) 
+```
+
+Estimated marginal means of total fatty acids percentage, at fixed temperature of 303 K and pressure of 60 bar, for flow rates of 4, 7, and 10 L/min, and times of 30, 75, and 120 minutes:
+
+```{r}
+library(emmeans)
+emmip(
+  mdl1,
+  ~ Flow | Time,
+  CIs = T,
+  at = list(
+    Pressure= c(60),
+    Flow = c(4, 7, 10),
+    Time = c(30, 75, 120),
+    Temperature = c(303)
+  ),
+  type = 'response',
+  CIarg = list(
+    linewidth = 1.5,
+    alpha = 0.3,
+    color = "orange"
+  ),
+  dotarg = list(
+    size = 2,
+    shape = "square",
+    color = "black"
+  ),
+  facetlab = 'label_both',
+  ylab = "Predicted fatty acids %",
+  xlab = "Flow (L/min)"
+) + ggplot2::labs(title = 'Temperature = 303 K, Pressure = 60 bar')
+
+```
+Numerical values of the estimated marginal means (i.e., predictions):
+```{r}
+#| echo: FALSE
+emmip(
+  mdl1,
+  ~ Flow | Time,
+  CIs = T,
+  at = list(
+    Pressure= c(60),
+    Flow = c(4, 7, 10),
+    Time = c(30, 75, 120),
+    Temperature = c(303)
+  ),
+  type = 'response', 
+  plotit = FALSE) 
+```
+
+
+------------------------------------------------------------------------
+
+## Model 2
+
+Linear mixed effect model for fraction of C 18:0, with total fraction of FAs as covariate, replicate as random effect, and removing observations with missing values:
+
+```{r}
+mdl2 <- nlme::lme(fixed = C180 ~ Pressure + Temperature + Flow + Time + FA, 
+            random = ~ 1 | Replicate, 
+            data = df, 
+            method = "REML", na.action = na.omit,
+            correlation = corCompSymm(form = ~ 1 | Replicate))
+summary(mdl2)
+```
+
+Various diagnostic plots for `mdl2`:
+
+```{r}
+# residuals vs fitted (default), should be uniformly scattered 
+# around the zero line
+plot(mdl2) 
+# observed vs fitted, should be distributed around the identity line
+plot(mdl2, C180 ~ fitted(.) | Replicate, abline = c(0,1)) 
+# boxplot of residuals by replicate, should all be centred around zero 
+# and with similar variance
+plot(mdl2, Replicate ~ resid(.)) 
+```
+
+Because pressure, temperature and flow were seen to be not associated with % C 18:0 in model 2, we refit model 2a only with time and FA as fixed effects. 
+
+```{r}
+mdl2a <- nlme::lme(fixed = C180 ~ Time + FA, 
+            random = ~ 1 | Replicate, 
+            data = df, 
+            method = "REML", na.action = na.omit,
+            correlation = corCompSymm(form = ~ 1 | Replicate))
+summary(mdl2a)
+```
+
+The comparison between model 2 and model 2a in terms of information criteria (AIC, BIC) suggests that model 2 with four fixed effects (pressure, temperature, flow, time) is able to explain more variability in the outcome, despite three fixed effects not being significantly associated with the outcome.
+
+Additionally, model 1 suggests that flow is significantly associated with the total fraction of fatty acids (FA). Based on this, it may not be appropriate to include FA as covariate in model 2 in addition to flow, because it would be equivalent to regress flow out twice. Therefore we refit model 2 without FA:
+```{r}
+mdl2b <- nlme::lme(fixed = C180 ~ Pressure + Temperature + Flow + Time, 
+            random = ~ 1 | Replicate, 
+            data = df, 
+            method = "REML", na.action = na.omit,
+            correlation = corCompSymm(form = ~ 1 | Replicate))
+summary(mdl2b)
+```
+
+In this model 2b both time and flow have a strong effect on the % C 18:0. Additionally, the comparison between model 2 and model 2b in terms of information criteria (AIC, BIC) confirms that model 2b provides a better fit than model 2.
+
+Estimated marginal means of percentage of C 18:0 in the extracted sample, at fixed temperature of 303 K and pressure of 60 bar, for flow rates of 4, 7, and 10 L/min, and times of 30, 75, and 120 minutes:
+
+```{r}
+#| echo: FALSE
+
+emmip(
+  mdl2b,
+  ~ Flow | Time,
+  CIs = T,
+  at = list(
+    Pressure = 60,
+    Flow = c(4, 7, 10),
+    Time = c(30, 75, 120),
+    Temperature = c(303)
+  ),
+  type = 'response',
+  CIarg = list(
+    linewidth = 1.5,
+    alpha = 0.3,
+    color = "orange"
+  ),
+  dotarg = list(
+    size = 2,
+    shape = "square",
+    color = "black"
+  ),
+  facetlab = 'label_both',
+  ylab = "Predicted C 18:0 %",
+  xlab = "Flow (L/min)"
+) + ggplot2::labs(title = 'Temperature = 303 K, pressure = 60 bar')
+```
+Numerical values of the estimated marginal means (i.e., predictions):
+```{r}
+#| echo: FALSE
+emmip(
+  mdl2b,
+  ~ Flow | Time,
+  CIs = T,
+  at = list(
+    Pressure= c(60),
+    Flow = c(4, 7, 10),
+    Time = c(30, 75, 120),
+    Temperature = c(303)
+  ),
+  type = 'response', 
+  plotit = FALSE) 
+```
+------------------------------------------------------------------------
+
+```{r}
+sessionInfo()
+```
