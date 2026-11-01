@@ -628,6 +628,138 @@ emmip(
 ```
 ------------------------------------------------------------------------
 
+# Detection and identification of analytes in positive and negative mode
+
+```{r}
+#| echo: FALSE
+pos <- read_excel("C:/Users/MarziaScelsi/Downloads/Features positive mode 29-10-2026.xlsx", sheet = "SFE_LC")[2:44,c(1:5, 7:10, 12:15, 17:20, 22:24)] %>% 
+  rename("lvl2_pres_Y" = "PRES...8", 
+         "lvl2_pres_N" = "ABS...9",
+         "lvl2_pres_perc" = "% freq PRES...10",
+         "lvl3_pres_Y" = "PRES...13", 
+         "lvl3_pres_N" = "ABS...14",
+         "lvl3_pres_perc" = "% freq PRES...15",
+         "lvl4_pres_Y" = "PRES...18", 
+         "lvl4_pres_N" = "ABS...19",
+         "lvl4_pres_perc" = "% freq PRES...20",
+         "tot_pres_Y" = "PRES analiti",
+         "tot_pres_perc" = "% freq PRES...24")
+  
+neg <- read_excel("C:/Users/MarziaScelsi/Downloads/Features negative mode 29-10-2026.xlsx", sheet = "SFE_LC")[2:44,c(1:5, 7:10, 12:15, 17:20, 22:24)] %>% 
+  rename("lvl2_pres_Y" = "PRES...8", 
+         "lvl2_pres_N" = "ABS...9",
+         "lvl2_pres_perc" = "% freq PRES...10",
+         "lvl3_pres_Y" = "PRES...13", 
+         "lvl3_pres_N" = "ABS...14",
+         "lvl3_pres_perc" = "% freq PRES...15",
+         "lvl4_pres_Y" = "PRES...18", 
+         "lvl4_pres_N" = "ABS...19",
+         "lvl4_pres_perc" = "% freq PRES...20",
+         "tot_pres_Y" = "PRES analiti",
+         "tot_pres_perc" = "% freq PRES...24")
+```
+
+```{r}
+#| echo: FALSE
+
+# pivot datasets
+pos_long <- pos %>% select(-c(`LEVEL 2`, `level 3`, `level 4`)) %>% 
+  pivot_longer(cols = c(lvl2_pres_Y, lvl2_pres_N, lvl2_pres_perc,
+                       lvl3_pres_Y, lvl3_pres_N, lvl3_pres_perc,
+                       lvl4_pres_Y, lvl4_pres_N, lvl4_pres_perc,
+                       tot_pres_Y, tot_pres_perc),
+               names_to = c("level", ".value"),
+               names_pattern = "(lvl[234]|tot)_pres_(.*)") %>% 
+  mutate(level = factor(case_when(level == "lvl2" ~ "Level 2",
+                           level == "lvl3" ~ "Level 3",
+                           level == "lvl4" ~ "Level 4",
+                           TRUE ~ "Total")))
+
+neg_long <- neg %>% select(-c(`level 2`, `level 3`, `level 4`)) %>% 
+  pivot_longer(cols = c(lvl2_pres_Y, lvl2_pres_N, lvl2_pres_perc,
+                       lvl3_pres_Y, lvl3_pres_N, lvl3_pres_perc,
+                       lvl4_pres_Y, lvl4_pres_N, lvl4_pres_perc,
+                       tot_pres_Y, tot_pres_perc),
+               names_to = c("level", ".value"),
+               names_pattern = "(lvl[234]|tot)_pres_(.*)") %>% 
+  mutate(level = factor(case_when(level == "lvl2" ~ "Level 2",
+                           level == "lvl3" ~ "Level 3",
+                           level == "lvl4" ~ "Level 4",
+                           TRUE ~ "Total")))
+```
+
+```{r}
+ggplot(pos_long, aes(x = factor(`Pressure (bar)`), y = perc, fill = level)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Percentage of analytes vs pressure",
+       subtitle = "Analytes detected in positive mode", 
+       x = "Pressure (bar)", y = "% of analytes detected") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+ggplot(pos_long, aes(x = factor(`Temperature (K)`), y = perc, fill = level)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Percentage of analytes vs temperature",
+       subtitle = "Analytes detected in positive mode", 
+       x = "Temperature (K)", y = "% of analytes detected") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+ggplot(pos_long, aes(x = factor(`Flow (L/min)`), y = perc, fill = level)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Percentage of analytes vs flow",
+       subtitle = "Analytes detected in positive mode", 
+       x = "Flow (L/min)", y = "% of analytes detected") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+ggplot(pos_long, aes(x = factor(`Time (min)`), y = perc, fill = level)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Percentage of analytes vs time",
+       subtitle = "Analytes detected in positive mode", 
+       x = "Time (min)", y = "% of analytes detected") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+```{r}
+#| echo: FALSE
+
+ggplot(neg_long, aes(x = factor(`Pressure (bar)`), y = perc, fill = level)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Percentage of analytes vs pressure",
+       subtitle = "Analytes detected in negative mode", 
+       x = "Pressure (bar)", y = "% of analytes detected") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+ggplot(neg_long, aes(x = factor(`Temperature (K)`), y = perc, fill = level)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Percentage of analytes vs temperature",
+       subtitle = "Analytes detected in negative mode", 
+       x = "Temperature (K)", y = "% of analytes detected") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+ggplot(neg_long, aes(x = factor(`Flow (L/min)`), y = perc, fill = level)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Percentage of analytes vs flow",
+       subtitle = "Analytes detected in negative mode", 
+       x = "Flow (L/min)", y = "% of analytes detected") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+ggplot(neg_long, aes(x = factor(`Time (min)`), y = perc, fill = level)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Percentage of analytes vs time",
+       subtitle = "Analytes detected in negative mode", 
+       x = "Time (min)", y = "% of analytes detected") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+
+***
 ```{r}
 sessionInfo()
 ```
