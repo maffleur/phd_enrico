@@ -626,6 +626,7 @@ emmip(
   type = 'response', 
   plotit = FALSE) 
 ```
+
 ------------------------------------------------------------------------
 
 # Detection and identification of analytes in positive and negative mode
@@ -658,7 +659,6 @@ neg <- read_excel("C:/Users/MarziaScelsi/Downloads/Features negative mode 29-10-
          "tot_pres_Y" = "PRES analiti",
          "tot_pres_perc" = "% freq PRES...24")
 ```
-
 ```{r}
 #| echo: FALSE
 
@@ -688,76 +688,509 @@ neg_long <- neg %>% select(-c(`level 2`, `level 3`, `level 4`)) %>%
                            TRUE ~ "Total")))
 ```
 
+
+## Positive mode
+
 ```{r}
-ggplot(pos_long, aes(x = factor(`Pressure (bar)`), y = perc, fill = level)) +
-  geom_boxplot(position = "dodge") +
-  labs(title = "Percentage of analytes vs pressure",
-       subtitle = "Analytes detected in positive mode", 
-       x = "Pressure (bar)", y = "% of analytes detected") +
+#| echo: FALSE
+p1 <- ggplot(pos_long %>% filter(level != "Total"),
+             aes(
+               x = factor(`Pressure (bar)`),
+               y = perc,
+               fill = level
+             )) +
+  geom_boxplot(position = position_dodge(width = 0.8, preserve = 'single'),
+               median.linewidth = 2) +
+  labs(
+    title = "Percentage of analytes vs pressure",
+    subtitle = "Analytes detected in positive mode",
+    x = "Pressure (bar)",
+    y = "% of analytes detected"
+  ) +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom")
 
-ggplot(pos_long, aes(x = factor(`Temperature (K)`), y = perc, fill = level)) +
-  geom_boxplot(position = "dodge") +
-  labs(title = "Percentage of analytes vs temperature",
-       subtitle = "Analytes detected in positive mode", 
-       x = "Temperature (K)", y = "% of analytes detected") +
+p2 <- ggplot(pos_long %>% filter(level != "Total"),
+             aes(
+               x = factor(`Temperature (K)`),
+               y = perc,
+               fill = level
+             )) +
+  geom_boxplot(position = position_dodge(width = 0.8, preserve = 'single'),
+               median.linewidth = 2) +
+  labs(
+    title = "Percentage of analytes vs temperature",
+    subtitle = "Analytes detected in positive mode",
+    x = "Temperature (K)",
+    y = "% of analytes detected"
+  ) +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom")
 
-ggplot(pos_long, aes(x = factor(`Flow (L/min)`), y = perc, fill = level)) +
-  geom_boxplot(position = "dodge") +
-  labs(title = "Percentage of analytes vs flow",
-       subtitle = "Analytes detected in positive mode", 
-       x = "Flow (L/min)", y = "% of analytes detected") +
+p3 <- ggplot(pos_long %>% filter(level != "Total"),
+             aes(
+               x = factor(`Flow (L/min)`),
+               y = perc,
+               fill = level
+             )) +
+  geom_boxplot(position = position_dodge(width = 0.8, preserve = 'single'),
+               median.linewidth = 2) +
+  labs(
+    title = "Percentage of analytes vs flow",
+    subtitle = "Analytes detected in positive mode",
+    x = "Flow (L/min)",
+    y = "% of analytes detected"
+  ) +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom")
 
-ggplot(pos_long, aes(x = factor(`Time (min)`), y = perc, fill = level)) +
-  geom_boxplot(position = "dodge") +
-  labs(title = "Percentage of analytes vs time",
-       subtitle = "Analytes detected in positive mode", 
-       x = "Time (min)", y = "% of analytes detected") +
+p4 <- ggplot(pos_long %>% filter(level != "Total"),
+             aes(
+               x = factor(`Time (min)`),
+               y = perc,
+               fill = level
+             )) +
+  geom_boxplot(position = position_dodge(width = 0.8, preserve = 'single'),
+               median.linewidth = 2) +
+  labs(
+    title = "Percentage of analytes vs time",
+    subtitle = "Analytes detected in positive mode",
+    x = "Time (min)",
+    y = "% of analytes detected"
+  ) +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom")
+
+multiplot(p1, p2, p3, p4, cols = 2)
+```
+
+The statistical analyses below are conducted separately for each level of analyte identification certainty (level 2, 3, and 4), on data related to the analytes detected in positive mode. For each level, four Kruskal–Wallis tests are performed to compare the distribution of the percentage of all identified analytes detected in a given sample across the chosen settings of pressure, temperature, flow, and time; each explanatory variable is treated as a categorical factor. The four omnibus p-values obtained within each level are adjusted using the Holm step-down procedure to control the family-wise error rate at a two-sided significance level of 0.05.
+
+When a Holm-adjusted omnibus p-value is below 0.05, Dunn’s rank-based pairwise comparisons are performed between all observed settings of the corresponding explanatory variable. Within each significant level-variable combination, the Dunn-test p-values are separately adjusted using the Holm method across all pairwise comparisons. Results are reported using the Kruskal–Wallis \(H\) statistic, degrees of freedom, raw and Holm-adjusted omnibus p-values, and, where applicable, Dunn’s \(Z\) statistic together with raw and Holm-adjusted pairwise p-values.
+
+After Holm adjustment, no significant K-W differences were detected in any level. Therefore no follow-up with Dunn's pairwise comparisons was performed.
+
+The following is AI-generated code.
+```{r}
+#| echo: FALSE
+# non-parametric tests to see if the percentage of analytes (of each level) 
+# differs significantly among values of the experimental variables 
+# (pressure, temperature, flow, time)
+
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(rstatix)
+
+alpha <- 0.05
+
+variables_to_test <- c(
+  "Pressure (bar)",
+  "Temperature (K)",
+  "Flow (L/min)",
+  "Time (min)"
+)
+
+# Prepare analysis data
+analysis_df <- pos_long %>%
+  filter(level != "Total") %>%
+  mutate(
+    level = droplevels(factor(level)),
+    perc  = as.numeric(perc)
+  )
+```
+
+```{r}
+# Kruskal-Wallis omnibus test
+kw_results <- analysis_df %>%
+  group_by(level) %>%
+  group_modify(
+    ~ map_dfr(
+      variables_to_test,
+      function(variable) {
+
+        test_data <- .x %>%
+          transmute(
+            perc      = perc,
+            predictor = factor(.data[[variable]])
+          ) %>%
+          filter(
+            !is.na(perc),
+            !is.na(predictor)
+          ) %>%
+          droplevels()
+
+        n_groups <- n_distinct(test_data$predictor)
+
+        # A Kruskal-Wallis test requires at least two groups
+        if (n_groups < 2L) {
+          return(
+            tibble(
+              variable  = variable,
+              n         = nrow(test_data),
+              n_groups  = n_groups,
+              statistic = NA_real_,
+              df        = NA_real_,
+              p_value   = NA_real_
+            )
+          )
+        }
+
+        kw_test <- kruskal.test(
+          perc ~ predictor,
+          data = test_data
+        )
+
+        tibble(
+          variable  = variable,
+          n         = nrow(test_data),
+          n_groups  = n_groups,
+          statistic = unname(kw_test$statistic),
+          df        = unname(kw_test$parameter),
+          p_value   = kw_test$p.value
+        )
+      }
+    )
+  ) %>%
+  ungroup() %>%
+  group_by(level) %>%
+  mutate(
+    # Holm correction across pressure, temperature, flow and time
+    p_adjusted = p.adjust(p_value, method = "holm"),
+    significant = !is.na(p_adjusted) & p_adjusted < alpha
+  ) %>%
+  ungroup()
 ```
 
 ```{r}
 #| echo: FALSE
 
-ggplot(neg_long, aes(x = factor(`Pressure (bar)`), y = perc, fill = level)) +
-  geom_boxplot(position = "dodge") +
-  labs(title = "Percentage of analytes vs pressure",
-       subtitle = "Analytes detected in negative mode", 
-       x = "Pressure (bar)", y = "% of analytes detected") +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom")
+kw_results_report <- kw_results %>%
+  mutate(
+    level = as.character(level),
+    variable = recode(
+      variable,
+      "Pressure (bar)"   = "Pressure",
+      "Temperature (K)" = "Temperature",
+      "Flow (L/min)"     = "Flow",
+      "Time (min)"       = "Time"
+    ),
+    statistic = round(statistic, 2),
+    p_value = format.pval(
+      p_value,
+      digits = 3,
+      eps = 0.001
+    ),
+    p_adjusted = format.pval(
+      p_adjusted,
+      digits = 3,
+      eps = 0.001
+    ),
+    significant = if_else(
+      significant,
+      "Yes",
+      "No"
+    )
+  ) %>%
+  select(
+    level,
+    variable,
+    n,
+    n_groups,
+    statistic,
+    df,
+    p_value,
+    p_adjusted,
+    significant
+  )
 
-ggplot(neg_long, aes(x = factor(`Temperature (K)`), y = perc, fill = level)) +
-  geom_boxplot(position = "dodge") +
-  labs(title = "Percentage of analytes vs temperature",
-       subtitle = "Analytes detected in negative mode", 
-       x = "Temperature (K)", y = "% of analytes detected") +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom")
-
-ggplot(neg_long, aes(x = factor(`Flow (L/min)`), y = perc, fill = level)) +
-  geom_boxplot(position = "dodge") +
-  labs(title = "Percentage of analytes vs flow",
-       subtitle = "Analytes detected in negative mode", 
-       x = "Flow (L/min)", y = "% of analytes detected") +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom")
-
-ggplot(neg_long, aes(x = factor(`Time (min)`), y = perc, fill = level)) +
-  geom_boxplot(position = "dodge") +
-  labs(title = "Percentage of analytes vs time",
-       subtitle = "Analytes detected in negative mode", 
-       x = "Time (min)", y = "% of analytes detected") +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom")
+kw_results_report %>%
+  knitr::kable(
+    format = "latex",
+    booktabs = TRUE,
+    digits = 3,
+    caption = "Kruskal-Wallis test results for positive mode"
+  )
 ```
 
+
+```{r}
+#| eval: FALSE
+#| echo: FALSE
+
+# Run Dunn's test for pairwise comparisons only for significant (adjusted) omnibus tests
+# Chunk not evaluated because there are no significant K-W omnibus tests after Holm correction
+dunn_results <- significant_kw_tests %>%
+  select(level, variable) %>%
+  mutate(
+    dunn_result = map2(
+      level,
+      variable,
+      function(current_level, current_variable) {
+
+        test_data <- analysis_df %>%
+          filter(level == current_level) %>%
+          transmute(
+            perc      = perc,
+            predictor = factor(.data[[current_variable]])
+          ) %>%
+          filter(
+            !is.na(perc),
+            !is.na(predictor)
+          ) %>%
+          droplevels()
+
+        if (n_distinct(test_data$predictor) < 2L) {
+          return(tibble())
+        }
+
+        test_data %>%
+          rstatix::dunn_test(
+            perc ~ predictor,
+            p.adjust.method = "holm",
+            detailed = TRUE
+          ) %>%
+          transmute(
+            group1,
+            group2,
+            n1,
+            n2,
+            z_statistic = statistic,
+            p_value = p,
+            p_adjusted = p.adj,
+            p_adjustment_method = p.adj.method,
+            significant = p_adjusted < alpha,
+            significance = p.adj.signif
+          )
+      }
+    )
+  ) %>%
+  unnest(dunn_result) %>%
+  arrange(
+    level,
+    variable,
+    p_adjusted
+  )
+
+dunn_results
+
+```
+
+
+## Negative mode
+
+```{r}
+#| echo: FALSE
+
+p1 <- ggplot(neg_long %>% filter(level != "Total"),
+             aes(
+               x = factor(`Pressure (bar)`),
+               y = perc,
+               fill = level
+             )) +
+  geom_boxplot(position = position_dodge(width = 0.8, preserve = 'single'),
+               median.linewidth = 2) +
+  labs(
+    title = "Percentage of analytes vs pressure",
+    subtitle = "Analytes detected in negative mode",
+    x = "Pressure (bar)",
+    y = "% of analytes detected"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+p2 <- ggplot(neg_long %>% filter(level != "Total"),
+             aes(
+               x = factor(`Temperature (K)`),
+               y = perc,
+               fill = level
+             )) +
+  geom_boxplot(position = position_dodge(width = 0.8, preserve = 'single'),
+               median.linewidth = 2) +
+  labs(
+    title = "Percentage of analytes vs temperature",
+    subtitle = "Analytes detected in negative mode",
+    x = "Temperature (K)",
+    y = "% of analytes detected"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+p3 <- ggplot(neg_long %>% filter(level != "Total"),
+             aes(
+               x = factor(`Flow (L/min)`),
+               y = perc,
+               fill = level
+             )) +
+  geom_boxplot(position = position_dodge(width = 0.8, preserve = 'single'),
+               median.linewidth = 2) +
+  labs(
+    title = "Percentage of analytes vs flow",
+    subtitle = "Analytes detected in negative mode",
+    x = "Flow (L/min)",
+    y = "% of analytes detected"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+p4 <- ggplot(neg_long %>% filter(level != "Total"),
+             aes(
+               x = factor(`Time (min)`),
+               y = perc,
+               fill = level
+             )) +
+  geom_boxplot(position = position_dodge(width = 0.8, preserve = 'single'),
+               median.linewidth = 2) +
+  labs(
+    title = "Percentage of analytes vs time",
+    subtitle = "Analytes detected in negative mode",
+    x = "Time (min)",
+    y = "% of analytes detected"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+multiplot(p1, p2, p3, p4, cols = 2)
+```
+
+The results below are produced with the same AI-generated code as above, applied to the percentages of analytes detected in negative mode:
+```{r}
+#| echo: FALSE
+
+# non-parametric tests to see if the percentage of analytes (of each level) 
+# differs significantly among values of the experimental variables 
+# (pressure, temperature, flow, time)
+
+alpha <- 0.05
+
+variables_to_test <- c(
+  "Pressure (bar)",
+  "Temperature (K)",
+  "Flow (L/min)",
+  "Time (min)"
+)
+
+# Prepare analysis data
+analysis_df <- neg_long %>%
+  filter(level != "Total") %>%
+  mutate(
+    level = droplevels(factor(level)),
+    perc  = as.numeric(perc)
+  )
+```
+
+```{r}
+#| echo: FALSE
+
+# Kruskal-Wallis omnibus test
+kw_results <- analysis_df %>%
+  group_by(level) %>%
+  group_modify(
+    ~ map_dfr(
+      variables_to_test,
+      function(variable) {
+
+        test_data <- .x %>%
+          transmute(
+            perc      = perc,
+            predictor = factor(.data[[variable]])
+          ) %>%
+          filter(
+            !is.na(perc),
+            !is.na(predictor)
+          ) %>%
+          droplevels()
+
+        n_groups <- n_distinct(test_data$predictor)
+
+        # A Kruskal-Wallis test requires at least two groups
+        if (n_groups < 2L) {
+          return(
+            tibble(
+              variable  = variable,
+              n         = nrow(test_data),
+              n_groups  = n_groups,
+              statistic = NA_real_,
+              df        = NA_real_,
+              p_value   = NA_real_
+            )
+          )
+        }
+
+        kw_test <- kruskal.test(
+          perc ~ predictor,
+          data = test_data
+        )
+
+        tibble(
+          variable  = variable,
+          n         = nrow(test_data),
+          n_groups  = n_groups,
+          statistic = unname(kw_test$statistic),
+          df        = unname(kw_test$parameter),
+          p_value   = kw_test$p.value
+        )
+      }
+    )
+  ) %>%
+  ungroup() %>%
+  group_by(level) %>%
+  mutate(
+    # Holm correction across pressure, temperature, flow and time
+    p_adjusted = p.adjust(p_value, method = "holm"),
+    significant = !is.na(p_adjusted) & p_adjusted < alpha
+  ) %>%
+  ungroup()
+```
+```{r}
+#| echo: FALSE
+kw_results_report <- kw_results %>%
+  mutate(
+    level = as.character(level),
+    variable = recode(
+      variable,
+      "Pressure (bar)"   = "Pressure",
+      "Temperature (K)" = "Temperature",
+      "Flow (L/min)"     = "Flow",
+      "Time (min)"       = "Time"
+    ),
+    statistic = round(statistic, 2),
+    p_value = format.pval(
+      p_value,
+      digits = 3,
+      eps = 0.001
+    ),
+    p_adjusted = format.pval(
+      p_adjusted,
+      digits = 3,
+      eps = 0.001
+    ),
+    significant = if_else(
+      significant,
+      "Yes",
+      "No"
+    )
+  ) %>%
+  select(
+    level,
+    variable,
+    n,
+    n_groups,
+    statistic,
+    df,
+    p_value,
+    p_adjusted,
+    significant
+  )
+
+kw_results_report %>%
+  knitr::kable(
+    format = "latex",
+    booktabs = TRUE,
+    digits = 3,
+    caption = "Kruskal-Wallis test results for negative mode"
+  )
+```
 
 ***
 ```{r}
